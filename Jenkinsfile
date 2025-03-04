@@ -1,28 +1,48 @@
 pipeline {
     agent any
 
+    environment {
+        IMAGE_NAME = "your-dockerhub-username/your-app-name"
+        GITHUB_CREDENTIALS = "github-credentials"
+        DOCKER_CREDENTIALS = "docker-hub-credentials"
+    }
+
     stages {
         stage('Clone Repository') {
             steps {
-                git 'https://github.com/malinivm/DevOpsProject1.git'
+                git credentialsId: "${GITHUB_CREDENTIALS}", url: 'git@github.com:your-username/your-repo.git', branch: 'main'
             }
         }
 
         stage('Build Docker Image') {
             steps {
                 script {
-                    sh 'docker build -t app.py .'
+                    sh 'docker build -t $IMAGE_NAME:latest .'
                 }
             }
         }
 
-        stage('Run Container') {
+        stage('Login to Docker Hub') {
             steps {
                 script {
-                    sh 'docker stop DevOpsProject1 || true'
-                    sh 'docker rm DevOpsProject1 || true'
-                    sh 'docker run -d --name DevOpsProject1 -p 5000:5000 app.py'
+                    withCredentials([usernamePassword(credentialsId: "${DOCKER_CREDENTIALS}", usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                        sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
+                    }
                 }
+            }
+        }
+
+        stage('Push Docker Image to Docker Hub') {
+            steps {
+                script {
+                    sh 'docker push $IMAGE_NAME:latest'
+                }
+            }
+        }
+
+        stage('Cleanup') {
+            steps {
+                sh 'docker rmi $IMAGE_NAME:latest || true'
             }
         }
     }
